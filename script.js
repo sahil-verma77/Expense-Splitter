@@ -29,6 +29,13 @@ const splitMemberCheckbox = document.querySelectorAll(".split-member-checkbox");
 const addExpenseBtn = getElementById("add-expense-btn");
 const expenseValidationHint = getElementById("expense-validation-hint");
 
+// Section: Expenses
+const expensesCount = getElementById("expenses-count");
+const expensesContent = getElementById("expenses-content");
+const expensesListWrapper = getElementById("expenses-list-wrapper");
+const expensesList = getElementById("expenses-list");
+const expensesEmpty = getElementById("expenses-empty");
+
 let allMembers = getItems(MEMBERS_LOCALSTORAGE_KEY); // Getting members from localStorage
 let expenses = getItems(EXPENSES_LOCALSTORAGE_KEY);
 
@@ -102,7 +109,19 @@ function renderMembers() {
         e.stopPropagation();
         const removeBtn = e.target.closest(".remove-member-btn"); // Finding Remove Button
         if (removeBtn) {
+            memberErrorMsg.classList.add("hidden");
             const id = removeBtn.dataset.id;
+            const isExpRecordExist = expenses.some((exp) => {
+                if (exp.payer === id || exp.splitMember.includes(id)) {
+                    return exp;
+                }
+            })
+            if (isExpRecordExist) {
+                memberErrorMsg.classList.remove("hidden");
+                memberErrorMsg.textContent = "Cannot remove member included in record expenses. Remove their expenses first.";
+                return;
+            }
+
             allMembers = allMembers.filter(({ id: memId }) => memId !== id);
             setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers);
             renderAll();
@@ -200,6 +219,7 @@ addExpenseForm.addEventListener("submit", (e) => {
     expenses.push({ id: `exp_${Date.now()}`, title, amount: amount.toFixed(2), payer, splitMember });
     setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
     addExpenseFormReset();
+    renderExpenses();
 })
 
 function addExpenseFormReset() {
@@ -208,8 +228,77 @@ function addExpenseFormReset() {
     expensePayerSelect.value = "";
     validateAddExpenseForm();
 }
+
+function getNameById(id) {
+    const result = allMembers.find((mem) => mem.id === id);
+    return result.name || "Anonymous";
+}
+
+function renderExpenses() {
+    expensesList.innerHTML = "";
+    const totalExpense = expenses.length;
+    expensesCount.textContent = `${totalExpense} ${totalExpense === 1 ? "expense" : "expenses"}`;
+    if (!totalExpense) {
+        expensesEmpty.classList.remove("hidden");
+        expensesList.classList.add("hidden");
+        return;
+    }
+    expensesEmpty.classList.add("hidden");
+    expensesList.classList.remove("hidden");
+
+    expenses.map(({ id, title, amount, payer, splitMember }) => {
+        const li = document.createElement("li");
+        const splitMemberNames = splitMember.map((mem) => getNameById(mem)).join(", ");
+        li.className = "py-3 px-1 hover:bg-slate-100/50 transition-colors";
+        li.innerHTML = `
+            <div class="flex items-start justify-between gap-3 sm:gap-4">
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-2">
+                        <h3 class="font-sans text-sm sm:text-base font-semibold text-ledger-ink break-words min-w-0">
+                            ${title}
+                        </h3>
+                        <div class="flex items-baseline gap-2 shrink-0 self-start sm:self-auto">
+                            <span class="font-mono text-sm sm:text-base font-semibold text-ledger-ink">
+                            ₹${amount}
+                            </span>
+                            <span class="font-mono text-xs text-ledger-muted">
+                            (₹${amount / splitMember.length} / person)
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs text-ledger-muted font-sans">
+                        <span>Paid by <strong class="font-medium text-ledger-ink">${getNameById(payer)}</strong></span>
+                        <span class="text-ledger-border">•</span>
+                        <span>Split between: <span class="text-ledger-ink font-medium break-words">${splitMemberNames}</span></span>
+                    </div>
+                </div>
+                <button type="button"
+                    class="delete-expense-btn text-ledger-muted hover:text-ledger-rust p-2 rounded-sm transition-colors cursor-pointer shrink-0 ml-1 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                    data-id=${id} title="Delete Groceries" aria-label="Delete Groceries">
+                    <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.75"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>`;
+        expensesList.append(li);
+    });
+
+    expensesList.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const dltExpBtn = e.target.closest(".delete-expense-btn");
+        if (dltExpBtn) {
+            const id = dltExpBtn.dataset.id;
+            expenses = expenses.filter(({ id: expId }) => expId !== id);
+            setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
+            renderAll();
+        }
+    })
+}
 function renderAll() {
     memberErrorMsg.classList.add("hidden");
     renderMembers();
+    renderExpenses();
 }
 renderAll();
