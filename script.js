@@ -1,15 +1,36 @@
 const BADGE_COLORS = ['#2F6B4F', '#3D5A80', '#8C5E58', '#6A7B76'];
 const MEMBERS_LOCALSTORAGE_KEY = "members";
+const EXPENSES_LOCALSTORAGE_KEY = "expenses";
 
-const membersCount = document.getElementById("members-count");
-const addMemberForm = document.getElementById("add-member-form");
-const memberNameInput = document.getElementById("member-name-input");
-const addMemberBtn = document.getElementById("add-member-btn");
-const memberErrorMsg = document.getElementById("member-error-msg");
-const membersList = document.getElementById("members-list");
-const membersEmpty = document.getElementById("members-empty");
+function getElementById(id) {
+    return document.getElementById(id);
+}
+
+// Section: Group Members
+const membersCount = getElementById("members-count");
+const addMemberForm = getElementById("add-member-form");
+const memberNameInput = getElementById("member-name-input");
+const addMemberBtn = getElementById("add-member-btn");
+const memberErrorMsg = getElementById("member-error-msg");
+const membersList = getElementById("members-list");
+const membersEmpty = getElementById("members-empty");
+
+// Section: Add Expense
+const addExpenseContent = getElementById("add-expense-content");
+const expenseMembersWarning = getElementById("expense-members-warning");
+const addExpenseForm = getElementById("add-expense-form");
+const expenseTitleInput = getElementById("expense-title-input");
+const expenseAmountInput = getElementById("expense-amount-input");
+const expensePayerSelect = getElementById("expense-payer-select");
+const splitSelectAllBtn = getElementById("split-select-all-btn");
+const splitClearAllBtn = getElementById("split-clear-all-btn");
+const splitMembersContainer = getElementById("split-members-container");
+const splitMemberCheckbox = document.querySelectorAll(".split-member-checkbox");
+const addExpenseBtn = getElementById("add-expense-btn");
+const expenseValidationHint = getElementById("expense-validation-hint");
 
 let allMembers = getItems(MEMBERS_LOCALSTORAGE_KEY); // Getting members from localStorage
+let expenses = getItems(EXPENSES_LOCALSTORAGE_KEY);
 
 function getItems(key) {
     return JSON.parse(localStorage.getItem(key)) || [];
@@ -27,9 +48,16 @@ addMemberForm.addEventListener("submit", (e) => {
     const value = memberNameInput.value.trim(); // Input Value
     if (!value) {
         memberErrorMsg.classList.remove("hidden");
+        memberErrorMsg.textContent = "Please enter a name.";
         return;
     }
-    memberErrorMsg.classList.add("hidden");
+
+    const isMemberAlreadyExist = allMembers.some(({ name }) => name.toLowerCase() === value.toLowerCase());
+    if (isMemberAlreadyExist) {
+        memberErrorMsg.classList.remove("hidden");
+        memberErrorMsg.textContent = "A member with this name already exist.";
+        return;
+    }
 
     allMembers = [...allMembers, { name: value, id: `mem_${Date.now()}` }];
     setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers); // Setting members to localStorage
@@ -80,9 +108,108 @@ function renderMembers() {
             renderAll();
         }
     })
+
+    expensePayerSelect.innerHTML = "";
+    splitMembersContainer.innerHTML = "";
+
+    if (allMembers.length < 2) { // Empty Message
+        expenseMembersWarning.classList.remove("hidden");
+        addExpenseForm.classList.add("hidden");
+        addExpenseFormReset();
+    } else {
+        expenseMembersWarning.classList.add("hidden");
+        addExpenseForm.classList.remove("hidden");
+        allMembers.forEach(({ name, id }) => {
+            let option = document.createElement("option");
+            option.textContent = name;
+            option.value = id;
+            expensePayerSelect.append(option);
+
+            let label = document.createElement("label");
+            label.className = "flex items-center gap-2.5 text-xs font-sans text-ledger-ink cursor-pointer hover:bg-slate-100/60 px-2 py-2 rounded-sm select-none border border-transparent hover:border-ledger-border transition-colors min-h-[36px]";
+            label.innerHTML = `
+                <input type="checkbox" value="${id}"
+                    class="split-member-checkbox rounded-sm text-ledger-forest accent-[#2F6B4F] cursor-pointer w-4 h-4 shrink-0"
+                    checked>
+                <span class="truncate break-all min-w-0">${name}</span>`;
+            splitMembersContainer.append(label);
+        })
+    }
+    validateAddExpenseForm();
 }
 
+let isValid = false;
+
+function validateAddExpenseForm() {
+    const title = expenseTitleInput.value.trim();
+
+    const amount = parseFloat(expenseAmountInput.value);
+    const isValidAmount = amount > 0;
+
+    const payer = expensePayerSelect.value;
+
+    const selectedCount = splitMembersContainer.querySelectorAll("input:checked").length;
+    const isValidSelectedCount = selectedCount > 0;
+
+    isValid = title && isValidAmount && isValidSelectedCount && payer;
+    addExpenseBtn.disabled = !isValid;
+
+    if (!title) {
+        expenseValidationHint.textContent = "Enter expense title.";
+    } else if (!isValidAmount) {
+        expenseValidationHint.textContent = "Enter a valid amount.";
+    } else if (!payer) {
+        expenseValidationHint.textContent = "Please select payer.";
+    } else if (selectedCount < 1) {
+        expenseValidationHint.textContent = "Select atleast 1 person to split.";
+    } else if (selectedCount > 1) {
+        expenseValidationHint.textContent = `Splitting between ${selectedCount} people.`;
+    }
+}
+
+[expenseTitleInput, expenseAmountInput].forEach((ele) => {
+    ele.addEventListener("input", validateAddExpenseForm);
+})
+
+splitMembersContainer.addEventListener("change", validateAddExpenseForm);
+expensePayerSelect.addEventListener("change", validateAddExpenseForm);
+
+function splitCheckboxToggle(checkedFlag) {
+    const checkedInputs = splitMembersContainer.querySelectorAll("input");
+    checkedInputs.forEach((e) => e.checked = checkedFlag);
+    validateAddExpenseForm();
+}
+splitSelectAllBtn.addEventListener("click", () => splitCheckboxToggle(true));
+splitClearAllBtn.addEventListener("click", () => splitCheckboxToggle(false));
+
+addExpenseForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!isValid) {
+        return;
+    }
+    const title = expenseTitleInput.value.trim();
+    const amount = parseFloat(expenseAmountInput.value);
+    const payer = expensePayerSelect.value;
+
+    // const splitMember = [];
+    // splitMembersContainer.querySelectorAll("input:checked").forEach(e => {
+    //     splitMember.push(e.value);
+    // });
+    let splitMember = Array.from(splitMembersContainer.querySelectorAll("input:checked")).map(e => e.value);
+
+    expenses.push({ id: `exp_${Date.now()}`, title, amount: amount.toFixed(2), payer, splitMember });
+    setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
+    addExpenseFormReset();
+})
+
+function addExpenseFormReset() {
+    expenseTitleInput.value = "";
+    expenseAmountInput.value = "";
+    expensePayerSelect.value = "";
+    validateAddExpenseForm();
+}
 function renderAll() {
+    memberErrorMsg.classList.add("hidden");
     renderMembers();
 }
 renderAll();
