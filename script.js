@@ -6,6 +6,13 @@ function getElementById(id) {
     return document.getElementById(id);
 }
 
+// Header
+const clearAllDefault = getElementById("clear-all-default");
+const clearAllBtn = getElementById("clear-all-btn");
+const clearAllConfirm = getElementById("clear-all-confirm");
+const confirmClearBtn = getElementById("confirm-clear-btn");
+const cancelClearBtn = getElementById("cancel-clear-btn");
+
 // Section: Group Members
 const membersCount = getElementById("members-count");
 const addMemberForm = getElementById("add-member-form");
@@ -86,7 +93,10 @@ function renderMembers() {
     expenseMembersWarning.classList.remove("hidden");
     addExpenseForm.classList.add("hidden");
 
-    membersCount.textContent = `${allMembers.length} members`;
+    membersCount.textContent = `${allMembers.length} ${allMembers.length === 1 ? "member" : "members"}`;
+
+    expensePayerSelect.innerHTML = "";
+    splitMembersContainer.innerHTML = "";
     if (!allMembers.length) { // Empty Message
         membersEmpty.classList.remove("hidden");
         membersList.classList.add("hidden");
@@ -102,7 +112,7 @@ function renderMembers() {
             <div class="flex items-center gap-3 min-w-0 flex-1">
                 <span
                     class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-medium text-white shrink-0 select-none"
-                    style="background-color: ${getRandomFetchColor()}">
+                    style="background-color: #2F6B4F;">
                     ${name[0].toUpperCase()}
                 </span>
                 <span class="font-sans text-sm font-medium text-ledger-ink truncate break-words">${name}</span>
@@ -251,7 +261,7 @@ function addExpenseFormReset() {
 
 function getNameById(id) {
     const result = allMembers.find((mem) => mem.id === id);
-    return result.name || "Anonymous";
+    return result?.name || "Anonymous";
 }
 
 function renderExpenses() {
@@ -282,7 +292,7 @@ function renderExpenses() {
                             ₹${amount}
                             </span>
                             <span class="font-mono text-xs text-ledger-muted">
-                            (₹${amount / splitMember.length} / person)
+                            (₹${(amount / splitMember.length).toFixed(2)} / person)
                             </span>
                         </div>
                     </div>
@@ -312,7 +322,6 @@ function renderExpenses() {
             const id = dltExpBtn.dataset.id;
             expenses = expenses.filter(({ id: expId }) => expId !== id);
             setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
-            renderExpenses();
             renderAll();
         }
     })
@@ -343,7 +352,7 @@ function renderBalance() {
                 owed += expAmount / splitMember.length;
             }
         })
-        let net = paid - owed;
+        let net = (paid - owed).toFixed(2);
         let statusElement = `<span class="text-ledger-muted">settled up</span>`;
 
         if (net > 0) {
@@ -369,6 +378,32 @@ function renderBalance() {
         balancesList.append(li);
     })
 }
+
+clearAllBtn.addEventListener("click", (e) => {
+    clearAllConfirm.classList.remove("hidden");
+    clearAllConfirm.classList.add("flex");
+    clearAllBtn.classList.add("hidden");
+})
+confirmClearBtn.addEventListener("click", (e) => {
+    allMembers = [];
+    expenses = [];
+    setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers);
+    setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
+
+    addExpenseFormReset();
+    clearAllConfirm.classList.add("hidden");
+    clearAllConfirm.classList.remove("flex");
+    clearAllBtn.classList.remove("hidden");
+
+    memberNameInput.value = "";
+    renderAll();
+})
+cancelClearBtn.addEventListener("click", (e) => {
+    clearAllConfirm.classList.add("hidden");
+    clearAllConfirm.classList.remove("flex");
+    clearAllBtn.classList.remove("hidden");
+})
+
 function renderAll() {
     memberErrorMsg.classList.add("hidden");
     renderMembers();
