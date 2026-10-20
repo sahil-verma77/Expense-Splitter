@@ -36,8 +36,15 @@ const expensesListWrapper = getElementById("expenses-list-wrapper");
 const expensesList = getElementById("expenses-list");
 const expensesEmpty = getElementById("expenses-empty");
 
+// Section: Balances
+const balancesContent = getElementById("balances-content");
+const balancesListWrapper = getElementById("balances-list-wrapper");
+const balancesList = getElementById("balances-list");
+const balancesEmpty = getElementById("balances-empty");
+const balancesHelperText = getElementById("balances-helper-text");
+
 let allMembers = getItems(MEMBERS_LOCALSTORAGE_KEY); // Getting members from localStorage
-let expenses = getItems(EXPENSES_LOCALSTORAGE_KEY);
+let expenses = getItems(EXPENSES_LOCALSTORAGE_KEY); // Getting members from localStorage
 
 function getItems(key) {
     return JSON.parse(localStorage.getItem(key)) || [];
@@ -53,6 +60,7 @@ function getRandomFetchColor() {
 addMemberForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const value = memberNameInput.value.trim(); // Input Value
+    memberErrorMsg.classList.add("hidden");
     if (!value) {
         memberErrorMsg.classList.remove("hidden");
         memberErrorMsg.textContent = "Please enter a name.";
@@ -68,12 +76,16 @@ addMemberForm.addEventListener("submit", (e) => {
 
     allMembers = [...allMembers, { name: value, id: `mem_${Date.now()}` }];
     setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers); // Setting members to localStorage
+
     memberNameInput.value = "";
     renderAll();
 })
 
 function renderMembers() {
     membersList.innerHTML = "";
+    expenseMembersWarning.classList.remove("hidden");
+    addExpenseForm.classList.add("hidden");
+
     membersCount.textContent = `${allMembers.length} members`;
     if (!allMembers.length) { // Empty Message
         membersEmpty.classList.remove("hidden");
@@ -138,6 +150,7 @@ function renderMembers() {
     } else {
         expenseMembersWarning.classList.add("hidden");
         addExpenseForm.classList.remove("hidden");
+
         allMembers.forEach(({ name, id }) => {
             let option = document.createElement("option");
             option.textContent = name;
@@ -155,6 +168,7 @@ function renderMembers() {
         })
     }
     validateAddExpenseForm();
+    renderBalance();
 }
 
 let isValid = false;
@@ -183,6 +197,10 @@ function validateAddExpenseForm() {
         expenseValidationHint.textContent = "Select atleast 1 person to split.";
     } else if (selectedCount > 1) {
         expenseValidationHint.textContent = `Splitting between ${selectedCount} people.`;
+    } else if (selectedCount == 1) {
+        expenseValidationHint.textContent = `Splitting between 1 person.`;
+    } else if (!payer) {
+        expenseValidationHint.textContent = `Please select payer.`;
     }
 }
 
@@ -203,6 +221,7 @@ splitClearAllBtn.addEventListener("click", () => splitCheckboxToggle(false));
 
 addExpenseForm.addEventListener("submit", (e) => {
     e.preventDefault();
+
     if (!isValid) {
         return;
     }
@@ -217,9 +236,10 @@ addExpenseForm.addEventListener("submit", (e) => {
     let splitMember = Array.from(splitMembersContainer.querySelectorAll("input:checked")).map(e => e.value);
 
     expenses.push({ id: `exp_${Date.now()}`, title, amount: amount.toFixed(2), payer, splitMember });
+
     setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
     addExpenseFormReset();
-    renderExpenses();
+    renderAll();
 })
 
 function addExpenseFormReset() {
@@ -292,13 +312,67 @@ function renderExpenses() {
             const id = dltExpBtn.dataset.id;
             expenses = expenses.filter(({ id: expId }) => expId !== id);
             setItems(EXPENSES_LOCALSTORAGE_KEY, expenses);
+            renderExpenses();
             renderAll();
         }
+    })
+}
+
+function renderBalance() {
+    balancesList.innerHTML = "";
+    if (!allMembers.length) {
+        balancesList.classList.add("hidden");
+        balancesHelperText.classList.add("hidden");
+        balancesEmpty.classList.remove("hidden");
+        return;
+    }
+    balancesList.classList.remove("hidden");
+    balancesHelperText.classList.remove("hidden");
+    balancesEmpty.classList.add("hidden");
+
+    allMembers.map(({ name, id }) => {
+        let paid = 0;
+        let owed = 0;
+
+        expenses.forEach(({ amount, splitMember, payer }) => {
+            const expAmount = Number(amount);
+            if (payer === id) {
+                paid += expAmount;
+            }
+            if (splitMember.includes(id) && splitMember.length > 0) {
+                owed += expAmount / splitMember.length;
+            }
+        })
+        let net = paid - owed;
+        let statusElement = `<span class="text-ledger-muted">settled up</span>`;
+
+        if (net > 0) {
+            statusElement = `<span class="text-ledger-forest font-medium">gets back ₹${Math.abs(net)}</span>`;
+        } else if (net < 0) {
+            statusElement = `<span class="text-ledger-rust font-medium">owes ₹${Math.abs(net)}</span>`;
+        }
+
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between py-2.5 px-1 hover:bg-slate-100/50 transition-colors gap-3";
+        li.innerHTML = `
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                <span
+                    class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-medium text-white shrink-0 select-none"
+                    style="background-color: #8C5E58;">
+                    ${name[0].toUpperCase()}
+                </span>
+                <span class="font-sans text-sm font-medium text-ledger-ink truncate break-words">${name}</span>
+            </div>
+            <div class="font-mono text-sm shrink-0 ml-2 text-right">
+                ${statusElement}
+            </div>`;
+        balancesList.append(li);
     })
 }
 function renderAll() {
     memberErrorMsg.classList.add("hidden");
     renderMembers();
     renderExpenses();
+    renderBalance();
 }
 renderAll();
