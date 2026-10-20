@@ -59,9 +59,20 @@ function getItems(key) {
 function setItems(key, item) {
     localStorage.setItem(key, JSON.stringify(item));
 }
-function getRandomFetchColor() {
+function getRandomBadgeColor() {
     let randomIndex = Math.floor(Math.random() * BADGE_COLORS.length);
     return BADGE_COLORS[randomIndex];
+}
+let membersNeedSaving = false;
+allMembers = allMembers.map((mem) => {
+    if (mem.badgeColor) {
+        return mem;
+    }
+    membersNeedSaving = true;
+    return {...mem, badgeColor: getRandomBadgeColor()};
+})
+if (membersNeedSaving) {
+    setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers);
 }
 
 addMemberForm.addEventListener("submit", (e) => {
@@ -81,7 +92,7 @@ addMemberForm.addEventListener("submit", (e) => {
         return;
     }
 
-    allMembers = [...allMembers, { name: value, id: `mem_${Date.now()}` }];
+    allMembers = [...allMembers, { name: value, id: `mem_${Date.now()}`, badgeColor: getRandomBadgeColor() }];
     setItems(MEMBERS_LOCALSTORAGE_KEY, allMembers); // Setting members to localStorage
 
     memberNameInput.value = "";
@@ -105,14 +116,14 @@ function renderMembers() {
     membersEmpty.classList.add("hidden");
     membersList.classList.remove("hidden");
 
-    allMembers.forEach(({ name, id }) => { // Adding Members in the list
+    allMembers.forEach(({ name, id, badgeColor }) => { // Adding Members in the list
         let li = document.createElement("li");
         li.className = "flex items-center justify-between py-2.5 px-1 hover:bg-slate-100/50 transition-colors gap-2";
         li.innerHTML = `
             <div class="flex items-center gap-3 min-w-0 flex-1">
                 <span
                     class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-medium text-white shrink-0 select-none"
-                    style="background-color: #2F6B4F;">
+                    style="background-color: ${badgeColor}">
                     ${name[0].toUpperCase()}
                 </span>
                 <span class="font-sans text-sm font-medium text-ledger-ink truncate break-words">${name}</span>
@@ -339,7 +350,7 @@ function renderBalance() {
     balancesHelperText.classList.remove("hidden");
     balancesEmpty.classList.add("hidden");
 
-    allMembers.map(({ name, id }) => {
+    allMembers.map(({ name, id, badgeColor }) => {
         let paid = 0;
         let owed = 0;
 
@@ -367,7 +378,7 @@ function renderBalance() {
             <div class="flex items-center gap-3 min-w-0 flex-1">
                 <span
                     class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-medium text-white shrink-0 select-none"
-                    style="background-color: #8C5E58;">
+                    style="background-color: ${badgeColor}">
                     ${name[0].toUpperCase()}
                 </span>
                 <span class="font-sans text-sm font-medium text-ledger-ink truncate break-words">${name}</span>
